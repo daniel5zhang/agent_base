@@ -919,7 +919,7 @@ SQLite 阶段继续 `create_all`，进入试点前引入 Alembic。
 1. `approval.required` 是否在右侧业务面板新增审批 Tab；已确认：需要。Phase 1C 先做 mock 审批 Tab，后续接钉钉、企业微信或自建审批。
 2. 插件运行结果是否需要新增业务 Tab renderer；已确认：按 Artifact 类型和复杂度分流。主对话展示摘要和过程，右侧业务面板展示结构化、可操作、可审计、可持续查看的业务结果。内部业务插件默认 `both`，由 plugin manifest 的 `ui.result_surface`、`ui.renderer`、`ui.open_policy` 控制。
 3. Thread History 是否从 `Message` 切换为 `TranscriptEvent`；已确认：Phase 1B 不切换。当前前端继续使用 assistant-ui `react-ai-sdk` / `UIMessage` 路线，`Message` 继续作为前端历史消息来源。服务端新增 `TranscriptEvent`，用于 Agent Runtime、审计、工具回放和上下文恢复，并提供 `TranscriptEvent -> Message/UIMessage` 投影能力。前端 Runtime 是否迁移到 `AssistantTransport` 或 `AG-UI` 保留待定，等服务端能力完成后再评估。
-4. 设置页是否要暴露多 Model Provider 配置；
+4. 设置页是否要暴露多 Model Provider 配置；已确认：采用 UI 可配置方案。设置页需要支持新增、编辑、禁用、删除多个 Model Provider，字段包括 provider 名称、provider 类型、OpenAI-compatible base URL、API Key、模型列表、默认模型、启用状态和适用范围。API Key 只能提交给服务端保存，前端不得持久化明文密钥；服务端需要提供密钥加密、脱敏展示、连通性测试、租户级/用户级授权和审计记录。Phase 1B 先实现后端 `ModelProvider` 抽象和配置 API，前端设置页改动需单独列出方案并再次确认后开发。
 5. 插件 catalog 是否要在前端增加安装、授权、启停管理界面。
 
 ### 22.4 建议的下一份开发计划
