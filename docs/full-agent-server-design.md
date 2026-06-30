@@ -633,9 +633,26 @@ updated_at
 
 前端接入原则：
 
-- assistant-ui 对话区只展示自然语言和工具过程；
-- 右侧业务面板展示 Artifact；
+- assistant-ui 对话区负责 Agent 对话、过程、摘要和结论；
+- 右侧业务面板负责业务 Artifact、审批、表格、图表、表单、审计和可操作业务对象；
+- 插件结果不一刀切进入右侧面板，必须按 Artifact 类型和复杂度分流；
+- 简短文本结果在主对话展示；
+- 结构化、可操作、可审计、可持续查看的结果进入右侧业务 Tab；
+- 内部业务插件默认 `both`：主对话显示摘要，右侧面板展示完整业务结果；
 - 如果新增 Artifact 类型需要新 UI renderer，必须先与用户确认前端修改内容。
+
+建议插件 manifest 增加 UI 分流声明：
+
+```json
+{
+  "ui": {
+    "result_surface": "chat_inline | right_panel | both",
+    "renderer": "ask_data_result",
+    "open_policy": "auto | manual | never",
+    "summary_in_chat": true
+  }
+}
+```
 
 ## 15. API 设计
 
@@ -899,8 +916,8 @@ SQLite 阶段继续 `create_all`，进入试点前引入 Alembic。
 
 以下内容会影响前端或业务交互，需要单独确认后开发：
 
-1. `approval.required` 是否在右侧业务面板新增审批 Tab；
-2. 插件运行结果是否需要新增业务 Tab renderer；
+1. `approval.required` 是否在右侧业务面板新增审批 Tab；已确认：需要。Phase 1C 先做 mock 审批 Tab，后续接钉钉、企业微信或自建审批。
+2. 插件运行结果是否需要新增业务 Tab renderer；已确认：按 Artifact 类型和复杂度分流。主对话展示摘要和过程，右侧业务面板展示结构化、可操作、可审计、可持续查看的业务结果。内部业务插件默认 `both`，由 plugin manifest 的 `ui.result_surface`、`ui.renderer`、`ui.open_policy` 控制。
 3. Thread History 是否从 `Message` 切换为 `TranscriptEvent`；
 4. 设置页是否要暴露多 Model Provider 配置；
 5. 插件 catalog 是否要在前端增加安装、授权、启停管理界面。
