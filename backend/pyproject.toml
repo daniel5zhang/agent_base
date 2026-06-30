@@ -1,0 +1,14 @@
+[project]
+name = "workbench-server"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "sqlalchemy",
+  "pydantic",
+  "uvicorn"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

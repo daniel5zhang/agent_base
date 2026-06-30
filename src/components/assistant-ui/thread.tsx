@@ -133,7 +133,7 @@ const ThreadRoot: FC<{
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
       style={{
-        ["--thread-max-width" as string]: "48rem",
+        ["--thread-max-width" as string]: "42rem",
         ["--composer-bg" as string]:
           "color-mix(in oklab, var(--color-muted) 30%, var(--color-background))",
         ["--composer-radius" as string]: "1.5rem",
@@ -143,7 +143,7 @@ const ThreadRoot: FC<{
       <ThreadPrimitive.Viewport
         turnAnchor="bottom"
         data-slot="aui_thread-viewport"
-        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
+        className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto scroll-smooth [scrollbar-gutter:stable]"
       >
         <div
           className={cn(
@@ -289,6 +289,7 @@ const AssistantMessage: FC = () => {
     ToolGroup,
     ReasoningGroup,
   } = useContext(ThreadComponentsContext);
+  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
 
   // reserves space for action bar and compensates with `-mb` for consistent msg spacing
   // keeps hovered action bar from shifting layout (autohide doesn't support absolute positioning well)
@@ -337,9 +338,9 @@ const AssistantMessage: FC = () => {
                     <ReasoningGroup group={part}>{children}</ReasoningGroup>
                   );
                 }
-                const running = part.status.type === "running";
+                const running = part.status.type === "running" || messageRunning;
                 return (
-                  <ReasoningRoot streaming={running}>
+                  <ReasoningRoot streaming={running} variant="ghost">
                     <ReasoningTrigger active={running} />
                     <ReasoningContent aria-busy={running}>
                       <ReasoningText>{children}</ReasoningText>

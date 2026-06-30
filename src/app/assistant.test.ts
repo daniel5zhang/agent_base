@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { extractRuntimeArtifactFromMessages, normalizeRuntimeArtifactForThreadState } from "./assistant";
+import {
+  extractRuntimeArtifactFromMessages,
+  normalizeRuntimeArtifactForThreadState,
+} from "./assistant";
 
 describe("assistant runtime artifact extraction", () => {
   it("extracts the latest server tool output regardless of tool name", () => {
@@ -140,7 +143,7 @@ describe("assistant runtime artifact extraction", () => {
 
     expect(artifact).toEqual({
       title: "Agent 正在运行",
-      summary: "当前事件：model.started",
+      summary: "调用模型",
       auditEventId: undefined,
       events: ["run.created", "model.started"],
       toolName: "通用 Agent",

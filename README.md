@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 企业 Agent 工作台
 
-## Getting Started
+本仓库提交到 `daniel5zhang/agent_base.git`，当前按前后端分层管理：
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+.
+├── src/                 # 前端源码，Next.js + assistant-ui
+├── src/app/api/chat/    # 前端到后端 Agent SSE 的 Next.js Bridge
+├── src/features/        # 工作台外壳与业务面板
+├── backend/             # 后端源码，Python FastAPI Agent Runtime
+└── docs/                # 架构、参考项目分析、详细设计文档
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 前端
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+技术栈：
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js
+- React
+- assistant-ui
+- Vercel AI SDK
+- shadcn/ui
+- Base UI
+- Tailwind CSS
 
-## Learn More
+开发启动：
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+默认访问：
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+http://127.0.0.1:3001
+```
 
-## Deploy on Vercel
+## 后端
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+技术栈：
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Python
+- FastAPI
+- SQLAlchemy
+- SQLite
+- OpenAI-compatible model API
+
+开发启动：
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+环境变量示例：
+
+```text
+backend/.env.example
+```
+
+## 关键文档
+
+- `docs/full-agent-server-design.md`
+- `docs/reference-claude-code-analysis.md`
+
+## 当前阶段
+
+前端以 assistant-ui 为主构建通用 Agent 对话体验。后端以 `claude-code-main` 的 QueryEngine / Tool / Permission / Memory / Plugin 思路为参考，建设 Python FastAPI 版企业 Agent Runtime。

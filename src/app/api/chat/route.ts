@@ -5,6 +5,7 @@ import {
 } from "ai";
 
 type IncomingBody = {
+  id?: string;
   messages?: UIMessage[];
   thread_id?: string;
 };
@@ -94,6 +95,43 @@ function writeText(writer: StreamWriter, id: string, text: string) {
   writer.write({ type: "text-start", id });
   writer.write({ type: "text-delta", id, delta: text });
   writer.write({ type: "text-end", id });
+}
+
+function fallbackChunkDelayMs() {
+  if (process.env.NODE_ENV === "test") return 0;
+  const configured = Number(process.env.WORKBENCH_TYPEWRITER_DELAY_MS);
+  return Number.isFinite(configured) && configured >= 0 ? configured : 18;
+}
+
+function chunkText(text: string, chunkSize = 4) {
+  const chars = Array.from(text);
+  const chunks: string[] = [];
+  for (let index = 0; index < chars.length; index += chunkSize) {
+    chunks.push(chars.slice(index, index + chunkSize).join(""));
+  }
+  return chunks;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function streamTextFallback(
+  writer: StreamWriter,
+  id: string,
+  text: string,
+  signal?: AbortSignal,
+) {
+  startText(writer, id);
+  const delayMs = fallbackChunkDelayMs();
+  for (const chunk of chunkText(text)) {
+    if (signal?.aborted) throw new UserCancelledRunError();
+    appendText(writer, id, chunk);
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+  }
+  endText(writer, id);
 }
 
 function startText(writer: StreamWriter, id: string) {
@@ -337,6 +375,9 @@ async function consumeServerAgentStream(
           currentRunId = runtimeEvent.run_id ?? currentRunId;
           const delta = runtimeEvent.payload?.delta ?? "";
           if (delta) {
+            if (!textStarted && delta.trim().length === 0) {
+              continue;
+            }
             if (!textStarted) {
               startText(writer, streamingAnswerId);
               textStarted = true;
@@ -391,7 +432,7 @@ export async function POST(req: Request) {
   const url = new URL(req.url);
   const messages = body.messages ?? [];
   const question = getMessageText(messages.at(-1));
-  const threadId = threadIdFromMessages(messages, body.thread_id ?? url.searchParams.get("thread_id") ?? undefined);
+  const threadId = threadIdFromMessages(messages, body.thread_id ?? body.id ?? url.searchParams.get("thread_id") ?? undefined);
 
   const stream = createUIMessageStream({
     originalMessages: messages,
@@ -407,7 +448,7 @@ export async function POST(req: Request) {
         endReasoning(writer, reasoningId);
         writeToolOutput(writer, question, result);
         if (!streamedText) {
-          writeText(writer, `answer_${result.intent}`, result.response);
+          await streamTextFallback(writer, `answer_fallback_${result.intent}`, result.response, req.signal);
         }
       } catch (error) {
         if (error instanceof UserCancelledRunError || req.signal.aborted) {

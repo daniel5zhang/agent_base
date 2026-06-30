@@ -1,46 +1,17 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
-  BadgeCheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  FileClockIcon,
-  ListChecksIcon,
-  MessageSquareIcon,
+  GripVerticalIcon,
   PanelRightIcon,
-  RotateCcwIcon,
-  SettingsIcon,
-  ShieldCheckIcon,
-  WrenchIcon,
+  PlusIcon,
+  XIcon,
 } from "lucide-react";
+import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarSeparator,
-} from "@/components/ui/sidebar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 export type RuntimeArtifact = {
   title: string;
@@ -63,11 +34,8 @@ export type DiagnosticsState = {
 
 type WorkbenchShellProps = {
   thread?: ReactNode;
-  renderThread?: (slots: { historyHeader?: ReactNode; historyMessages?: ReactNode }) => ReactNode;
+  renderThread?: () => ReactNode;
   runtimeArtifact?: RuntimeArtifact;
-  activeThreadId?: string;
-  onSelectThread?: (threadId: string | undefined) => void;
-  onNewThread?: () => void;
 };
 
 type ModelCatalog = {
@@ -80,39 +48,6 @@ type ModelCatalog = {
   }>;
 };
 
-type RuntimeEventRow = {
-  event_id: string;
-  event_type: string;
-  payload_digest: string;
-  occurred_at?: string;
-};
-
-type ThreadRow = {
-  thread_id: string;
-  title: string;
-  workspace_id: string;
-  last_message: string;
-  message_count: number;
-};
-
-type ThreadMessageRow = {
-  message_id: string;
-  role: "user" | "assistant" | "system" | string;
-  content: string;
-  run_id?: string | null;
-  created_at?: string | null;
-};
-
-type ThreadDetail = {
-  thread: {
-    thread_id: string;
-    title: string;
-    workspace_id: string;
-    created_at?: string | null;
-  };
-  messages: ThreadMessageRow[];
-};
-
 export type RunStepRow = {
   step_id: string;
   step_type: string;
@@ -120,508 +55,111 @@ export type RunStepRow = {
   payload?: Record<string, unknown>;
 };
 
-type RunEvidence = {
-  events: RuntimeEventRow[];
-  eventsStatus?: string;
-  steps: RunStepRow[];
-  stepsStatus?: string;
+type BusinessPanelTab = {
+  id: string;
+  title: string;
 };
 
-function useRunEvidence(runId: string | undefined, refreshKey: string | undefined): RunEvidence {
-  const [runtimeEvents, setRuntimeEvents] = useState<RuntimeEventRow[]>([]);
-  const [runtimeEventsStatus, setRuntimeEventsStatus] = useState<string | undefined>();
-  const [runSteps, setRunSteps] = useState<RunStepRow[]>([]);
-  const [runStepsStatus, setRunStepsStatus] = useState<string | undefined>();
+function BusinessEmbedPanel({ open }: { open: boolean }) {
+  const [tabs, setTabs] = useState<BusinessPanelTab[]>([
+    { id: "panel-1", title: "面板 1" },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("panel-1");
 
-  useEffect(() => {
-    if (!runId) {
-      Promise.resolve().then(() => {
-        setRuntimeEvents([]);
-        setRuntimeEventsStatus(undefined);
-        setRunSteps([]);
-        setRunStepsStatus(undefined);
-      });
-      return;
-    }
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) {
-        setRuntimeEventsStatus("正在同步运行事件...");
-        setRunStepsStatus("正在同步执行步骤...");
-      }
-    });
-    Promise.allSettled([
-      fetch(`/api/runs/${runId}`)
-        .then((response) => {
-          if (!response.ok) throw new Error(`http_${response.status}`);
-          return response.json() as Promise<{ steps?: RunStepRow[] }>;
-        }),
-      fetch(`/api/runs/${runId}/events`)
-        .then((response) => {
-          if (!response.ok) throw new Error(`http_${response.status}`);
-          return response.json() as Promise<{ events: RuntimeEventRow[] }>;
-        }),
-    ]).then(([runResult, eventsResult]) => {
-      if (cancelled) return;
-      if (runResult.status === "fulfilled") {
-        const steps = runResult.value.steps ?? [];
-        setRunSteps(steps);
-        setRunStepsStatus(`已同步 ${steps.length} 个执行步骤`);
-      } else {
-        setRunSteps([]);
-        setRunStepsStatus(`执行步骤同步失败：${runResult.reason instanceof Error ? runResult.reason.message : "unknown_error"}`);
-      }
-      if (eventsResult.status === "fulfilled") {
-        setRuntimeEvents(eventsResult.value.events);
-        setRuntimeEventsStatus(`已同步 ${eventsResult.value.events.length} 条运行事件`);
-      } else {
-        setRuntimeEvents([]);
-        setRuntimeEventsStatus(`运行事件同步失败：${eventsResult.reason instanceof Error ? eventsResult.reason.message : "unknown_error"}`);
-      }
-    });
-    return () => {
-      cancelled = true;
+  function addTab() {
+    const nextIndex = tabs.length + 1;
+    const nextTab = {
+      id: `panel-${Date.now()}`,
+      title: `面板 ${nextIndex}`,
     };
-  }, [runId, refreshKey]);
-
-  return {
-    events: runtimeEvents,
-    eventsStatus: runtimeEventsStatus,
-    steps: runSteps,
-    stepsStatus: runStepsStatus,
-  };
-}
-
-function useRecentThreads(): { threads: ThreadRow[]; status?: string } {
-  const [threads, setThreads] = useState<ThreadRow[]>([]);
-  const [status, setStatus] = useState<string | undefined>("正在读取最近会话...");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/threads?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo")
-      .then((response) => {
-        if (!response.ok) throw new Error(`http_${response.status}`);
-        return response.json() as Promise<{ threads: ThreadRow[] }>;
-      })
-      .then((body) => {
-        if (cancelled) return;
-        setThreads(body.threads);
-        setStatus(body.threads.length > 0 ? undefined : "暂无会话");
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setThreads([]);
-        setStatus(`最近会话读取失败：${error instanceof Error ? error.message : "unknown_error"}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { threads, status };
-}
-
-function useThreadDetail(threadId: string | undefined): { detail?: ThreadDetail; status?: string } {
-  const [detail, setDetail] = useState<ThreadDetail | undefined>();
-  const [status, setStatus] = useState<string | undefined>();
-
-  useEffect(() => {
-    if (!threadId) {
-      Promise.resolve().then(() => {
-        setDetail(undefined);
-        setStatus(undefined);
-      });
-      return;
-    }
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) setStatus("正在加载会话...");
-    });
-    fetch(`/api/threads/${encodeURIComponent(threadId)}?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`http_${response.status}`);
-        return response.json() as Promise<ThreadDetail>;
-      })
-      .then((body) => {
-        if (cancelled) return;
-        setDetail(body);
-        setStatus(undefined);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setDetail(undefined);
-        setStatus(`会话加载失败：${error instanceof Error ? error.message : "unknown_error"}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [threadId]);
-
-  return { detail, status };
-}
-
-function WorkbenchSidebar({
-  onOpenSettings,
-  selectedThreadId,
-  onSelectThread,
-  onNewThread,
-}: {
-  onOpenSettings: () => void;
-  selectedThreadId?: string;
-  onSelectThread: (threadId: string) => void;
-  onNewThread: () => void;
-}) {
-  const recentThreads = useRecentThreads();
-
-  return (
-    <Sidebar role="navigation" aria-label="工作台导航" collapsible="icon" variant="sidebar">
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" isActive tooltip="企业 Agent 工作台">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <BadgeCheckIcon aria-hidden="true" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">企业 Agent 工作台</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-
-      <SidebarSeparator />
-
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="新建任务" onClick={onNewThread} isActive={!selectedThreadId}>
-                  <MessageSquareIcon aria-hidden="true" />
-                  <span>新建任务</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>最近会话</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {recentThreads.threads.length > 0 ? recentThreads.threads.map((thread) => (
-                <SidebarMenuItem key={thread.thread_id}>
-                  <SidebarMenuButton
-                    tooltip={thread.title}
-                    className="h-auto items-start py-2"
-                    isActive={selectedThreadId === thread.thread_id}
-                    onClick={() => onSelectThread(thread.thread_id)}
-                  >
-                    <MessageSquareIcon aria-hidden="true" />
-                    <span className="grid min-w-0 gap-0.5">
-                      <span className="truncate font-medium">{thread.title}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {thread.message_count} 条消息
-                      </span>
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )) : (
-                <SidebarMenuItem>
-                  <SidebarMenuButton disabled className="h-auto items-start py-2">
-                    <MessageSquareIcon aria-hidden="true" />
-                    <span className="truncate text-xs text-muted-foreground">
-                      {recentThreads.status ?? "暂无会话"}
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-      </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarSeparator />
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="设置与模型" onClick={onOpenSettings}>
-              <SettingsIcon aria-hidden="true" />
-              <span>设置与模型</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
-  );
-}
-
-function RuntimeInspector({
-  runtimeArtifact,
-  evidence,
-  onCollapse,
-}: {
-  runtimeArtifact?: RuntimeArtifact;
-  evidence: RunEvidence;
-  onCollapse: () => void;
-}) {
-  const fallbackEvents = runtimeArtifact?.events?.length
-    ? runtimeArtifact.events
-    : ["run.created", "intent.classified", "context.built", "model.completed"];
-  const visibleSteps = evidence.steps.length > 0
-    ? evidence.steps
-    : runtimeArtifact?.liveSteps ?? [
-      { step_id: "fallback-run", step_type: "run", status: runtimeArtifact?.status ?? "waiting" },
-    ];
-  const visibleStepsStatus = evidence.steps.length > 0
-    ? evidence.stepsStatus
-    : runtimeArtifact?.liveSteps?.length
-      ? `已接收 ${runtimeArtifact.liveSteps.length} 个实时步骤`
-      : evidence.stepsStatus;
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsState | undefined>();
-  const [diagnosticsError, setDiagnosticsError] = useState<string | undefined>();
-  const [runActionStatus, setRunActionStatus] = useState<string | undefined>();
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/diagnostics")
-      .then((response) => {
-        if (!response.ok) throw new Error(`http_${response.status}`);
-        return response.json() as Promise<DiagnosticsState>;
-      })
-      .then((body) => {
-        if (!cancelled) setDiagnostics(body);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setDiagnosticsError(error instanceof Error ? error.message : "unknown_error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function cancelRun() {
-    if (!runtimeArtifact?.runId) return;
-    const response = await fetch(`/api/runs/${runtimeArtifact.runId}/cancel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: "user_demo", reason: "用户取消" }),
-    });
-    const body = await response.json() as { run_id?: string; status?: string };
-    setRunActionStatus(body.status === "cancelled" && body.run_id
-      ? `运行已取消：${body.run_id}`
-      : "取消运行失败");
+    setTabs((currentTabs) => [...currentTabs, nextTab]);
+    setActiveTabId(nextTab.id);
   }
 
-  async function retryRun() {
-    if (!runtimeArtifact?.runId) return;
-    const response = await fetch(`/api/runs/${runtimeArtifact.runId}/retry`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: "user_demo" }),
-    });
-    const body = await response.json() as { run_id?: string; status?: string };
-    setRunActionStatus(body.status === "created" && body.run_id
-      ? `已创建重试运行：${body.run_id}`
-      : "重试运行失败");
+  function closeTab(tabId: string) {
+    if (tabs.length <= 1) return;
+
+    const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
+    const nextTabs = tabs.filter((tab) => tab.id !== tabId);
+    setTabs(nextTabs);
+
+    if (activeTabId === tabId) {
+      const fallbackTab =
+        nextTabs[Math.min(Math.max(tabIndex - 1, 0), nextTabs.length - 1)];
+      setActiveTabId(fallbackTab?.id ?? nextTabs[0]?.id ?? "panel-1");
+    }
   }
 
   return (
-    <aside aria-label="运行证据面板" className="hidden min-w-0 border-l bg-background lg:flex lg:w-[380px] lg:flex-col">
-      <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <PanelRightIcon aria-hidden="true" />
-            运行证据
+    <aside
+      aria-label="业务嵌入面板"
+      aria-hidden={!open}
+      className="flex size-full min-w-0 flex-col bg-background"
+    >
+      <div
+        data-slot="business-panel-tabs"
+        className="flex h-10 shrink-0 items-center gap-1 border-b px-2"
+        role="tablist"
+        aria-label="业务面板标签页"
+      >
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            role="tab"
+            tabIndex={0}
+            aria-label={tab.title}
+            aria-selected={activeTabId === tab.id}
+            className={[
+              "group/tab flex h-7 max-w-36 min-w-0 cursor-default items-center gap-1 rounded-md px-2 text-xs font-normal outline-none transition-colors",
+              "hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+              activeTabId === tab.id
+                ? "bg-secondary text-secondary-foreground"
+                : "text-foreground",
+            ].join(" ")}
+            onClick={() => setActiveTabId(tab.id)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              setActiveTabId(tab.id);
+            }}
+          >
+            <span className="min-w-0 truncate">{tab.title}</span>
+            <button
+              type="button"
+              aria-label={`关闭${tab.title}`}
+              className="text-muted-foreground/70 hover:bg-background/70 hover:text-foreground focus-visible:ring-ring/50 ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover/tab:opacity-100 group-focus-within/tab:opacity-100"
+              onClick={(event) => {
+                event.stopPropagation();
+                closeTab(tab.id);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.stopPropagation();
+                closeTab(tab.id);
+              }}
+            >
+              <XIcon aria-hidden="true" className="size-3" />
+            </button>
           </div>
-          <div className="text-xs text-muted-foreground">Artifact / Runtime Event / 诊断</div>
-        </div>
-        <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={onCollapse} aria-label="收起运行证据">
-          <ChevronRightIcon aria-hidden="true" className="size-4" />
+        ))}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="ml-auto size-7 rounded-md"
+          onClick={addTab}
+          aria-label="添加业务面板标签页"
+        >
+          <PlusIcon aria-hidden="true" className="size-4" />
         </Button>
       </div>
-
-      <Tabs defaultValue="artifact" className="min-h-0 flex-1 gap-0">
-        <div className="border-b px-4 py-3">
-          <TabsList variant="line" className="w-full justify-start">
-            <TabsTrigger value="artifact">Artifact</TabsTrigger>
-            <TabsTrigger value="events">事件</TabsTrigger>
-            <TabsTrigger value="diagnostics">诊断</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <ScrollArea className="min-h-0 flex-1">
-          <TabsContent value="artifact" className="flex flex-col gap-4 p-4">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ListChecksIcon aria-hidden="true" />
-                  {runtimeArtifact?.title ?? "等待 Agent 运行"}
-                </CardTitle>
-                <CardAction>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {runtimeArtifact?.status ? (
-                      <Badge variant={runtimeArtifact.status === "running" ? "default" : "secondary"}>
-                        {runtimeArtifact.status === "running" ? "运行中" : runtimeArtifact.status}
-                      </Badge>
-                    ) : null}
-                    <Badge variant="secondary">{runtimeArtifact?.toolName ?? "通用 Agent"}</Badge>
-                  </div>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {runtimeArtifact?.summary ?? "Agent 运行后，这里展示 Artifact、事件和诊断信息。"}
-                </p>
-                {runtimeArtifact?.artifactId || runtimeArtifact?.runId || runtimeArtifact?.latestEvent ? (
-                  <dl className="mt-4 grid grid-cols-[76px_1fr] gap-x-3 gap-y-2 text-xs">
-                    {runtimeArtifact.artifactId ? (
-                      <>
-                        <dt className="text-muted-foreground">Artifact</dt>
-                        <dd><code>{runtimeArtifact.artifactId}</code></dd>
-                      </>
-                    ) : null}
-                    {runtimeArtifact.runId ? (
-                      <>
-                        <dt className="text-muted-foreground">Run</dt>
-                        <dd><code>{runtimeArtifact.runId}</code></dd>
-                      </>
-                    ) : null}
-                    {runtimeArtifact.latestEvent ? (
-                      <>
-                        <dt className="text-muted-foreground">事件</dt>
-                        <dd><code>{runtimeArtifact.latestEvent}</code></dd>
-                      </>
-                    ) : null}
-                  </dl>
-                ) : null}
-                {runtimeArtifact?.runId ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={cancelRun}>取消运行</Button>
-                    <Button variant="secondary" size="sm" onClick={retryRun}>重试运行</Button>
-                  </div>
-                ) : null}
-                {runActionStatus ? (
-                  <p className="mt-3 text-xs text-muted-foreground">{runActionStatus}</p>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileClockIcon aria-hidden="true" />
-                  审计编号
-                </CardTitle>
-                <CardDescription>记录本次 Agent 运行的审计标识。</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <code className="block rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {runtimeArtifact?.auditEventId ?? "等待运行后生成 audit_event_id"}
-                </code>
-              </CardContent>
-            </Card>
-
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheckIcon aria-hidden="true" />
-                  运行边界
-                </CardTitle>
-                <CardDescription>当前只执行通用 Agent 能力；业务插件执行将在后续阶段接入。</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Badge variant="secondary">内置工具可用</Badge>
-                <Badge variant="outline">业务插件待接入</Badge>
-                <Badge variant="outline">不伪造业务结果</Badge>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="events" className="flex flex-col gap-4 p-4">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ListChecksIcon aria-hidden="true" />
-                  执行步骤
-                </CardTitle>
-                <CardDescription>
-                  {visibleStepsStatus ?? "RunStep 用于稳定展示 Agent 执行过程。"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {visibleSteps.map((step, index) => (
-                  <div key={`${step.step_id}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-xs">
-                    <div className="min-w-0">
-                      <code className="block truncate">{step.step_type}</code>
-                      <span className="text-muted-foreground">{step.step_id}</span>
-                    </div>
-                    <Badge variant={step.status === "completed" ? "secondary" : step.status === "failed" ? "destructive" : "outline"}>
-                      {step.status}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileClockIcon aria-hidden="true" />
-                  Runtime Event
-                </CardTitle>
-                <CardDescription>
-                  {evidence.eventsStatus ?? "事件用于端到端回放和审计。"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {(evidence.events.length > 0 ? evidence.events.map((event) => event.event_type) : fallbackEvents).map((event, index) => (
-                  <div key={`${event}-${index}`} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
-                    <RotateCcwIcon aria-hidden="true" className="text-muted-foreground" />
-                    <code>{event}</code>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="diagnostics" className="flex flex-col gap-4 p-4">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <WrenchIcon aria-hidden="true" />
-                  诊断状态
-                </CardTitle>
-                <CardDescription>
-                  {diagnostics
-                    ? `服务端状态：${diagnostics.status} · ${diagnostics.phase}`
-                    : diagnosticsError
-                      ? `诊断加载失败：${diagnosticsError}`
-                      : "正在读取服务端诊断状态..."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {diagnostics
-                  ? Object.entries(diagnostics.checks).map(([key, value]) => (
-                      <Badge key={key} variant={value === "ok" || value === "configured" ? "secondary" : "outline"}>
-                        {key}: {value}
-                      </Badge>
-                    ))
-                  : (
-                      <>
-                        <Badge variant="secondary">assistant-ui</Badge>
-                        <Badge variant="secondary">shadcn</Badge>
-                        <Badge variant="outline">OpenAI-compatible</Badge>
-                        <Badge variant="outline">业务插件待接入</Badge>
-                      </>
-                    )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </ScrollArea>
-      </Tabs>
+      <div
+        className="min-h-0 flex-1 bg-muted/10"
+        data-slot="business-panel-host"
+        role="tabpanel"
+        aria-label={tabs.find((tab) => tab.id === activeTabId)?.title ?? "业务面板"}
+      />
     </aside>
   );
 }
@@ -629,103 +167,123 @@ function RuntimeInspector({
 export function WorkbenchShell({
   thread,
   renderThread,
-  runtimeArtifact,
-  activeThreadId,
-  onSelectThread,
-  onNewThread,
 }: WorkbenchShellProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [localSelectedThreadId, setLocalSelectedThreadId] = useState<string | undefined>();
-  const selectedThreadId = activeThreadId ?? localSelectedThreadId;
-  const selectedThread = useThreadDetail(selectedThreadId);
-  const historyHeader = undefined;
-  const historyMessages = selectedThreadId
-    ? <ThreadHistoryMessages detail={selectedThread.detail} status={selectedThread.status} />
-    : undefined;
-  const runEvidenceRefreshKey = runtimeArtifact
-    ? [
-        runtimeArtifact.status,
-        runtimeArtifact.latestEvent,
-        runtimeArtifact.events.at(-1),
-        runtimeArtifact.events.length,
-      ].filter(Boolean).join(":")
-    : undefined;
-  const runEvidence = useRunEvidence(runtimeArtifact?.runId, runEvidenceRefreshKey);
+  const [businessPanelWidth, setBusinessPanelWidth] = useState(420);
+  const [businessPanelResizing, setBusinessPanelResizing] = useState(false);
+  const businessPanelResizeRef = useRef({ startX: 0, startWidth: 420 });
+
+  function constrainBusinessPanelWidth(width: number) {
+    if (typeof window === "undefined") return width;
+    const maxWidth = Math.max(320, window.innerWidth * 0.45);
+    return Math.min(Math.max(width, 280), maxWidth);
+  }
+
+  useEffect(() => {
+    if (!businessPanelResizing) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      const deltaX = event.clientX - businessPanelResizeRef.current.startX;
+      setBusinessPanelWidth(
+        constrainBusinessPanelWidth(businessPanelResizeRef.current.startWidth - deltaX),
+      );
+    }
+
+    function handlePointerUp() {
+      setBusinessPanelResizing(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [businessPanelResizing]);
+
+  function startBusinessPanelResize(event: PointerEvent<HTMLDivElement>) {
+    if (!inspectorOpen) return;
+    event.preventDefault();
+    businessPanelResizeRef.current = {
+      startX: event.clientX,
+      startWidth: businessPanelWidth,
+    };
+    setBusinessPanelResizing(true);
+  }
+
   return (
     <SidebarProvider>
-      <WorkbenchSidebar
+      <ThreadListSidebar
+        role="navigation"
+        aria-label="工作台导航"
+        collapsible="icon"
+        variant="sidebar"
         onOpenSettings={() => setSettingsOpen(true)}
-        selectedThreadId={selectedThreadId}
-        onSelectThread={(threadId) => {
-          setLocalSelectedThreadId(threadId);
-          onSelectThread?.(threadId);
-        }}
-        onNewThread={() => {
-          setLocalSelectedThreadId(undefined);
-          onSelectThread?.(undefined);
-          onNewThread?.();
-        }}
       />
-      <div className="flex h-svh min-w-0 flex-1 bg-background">
-        <main aria-label="Agent 对话" className="relative min-w-0 flex-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-3 z-10 hidden size-8 rounded-full lg:inline-flex"
-            onClick={() => setInspectorOpen((open) => !open)}
-            aria-label={inspectorOpen ? "收起运行证据" : "展开运行证据"}
-          >
-            {inspectorOpen ? (
-              <ChevronRightIcon aria-hidden="true" className="size-4" />
-            ) : (
-              <ChevronLeftIcon aria-hidden="true" className="size-4" />
+      <SidebarInset className="flex h-svh min-w-0 flex-1 bg-background">
+        <div
+          data-slot="assistant-business-sidebar"
+          className="flex min-h-0 flex-1 overflow-hidden"
+        >
+          <main aria-label="Agent 对话" className="relative min-w-0 flex-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-4 top-3 z-10 hidden rounded-[min(var(--radius-md),12px)] lg:inline-flex"
+              onClick={() => setInspectorOpen((open) => !open)}
+              aria-label={inspectorOpen ? "收起右侧面板" : "展开右侧面板"}
+            >
+              <PanelRightIcon aria-hidden="true" className="size-4 shrink-0" />
+            </Button>
+            {renderThread ? renderThread() : thread}
+          </main>
+          <div
+            role="separator"
+            aria-label="调整业务面板宽度"
+            aria-orientation="vertical"
+            aria-hidden={!inspectorOpen}
+            data-slot="business-panel-resize-handle"
+            className={cn(
+              "relative hidden w-px shrink-0 cursor-col-resize items-center justify-center bg-border transition-opacity duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] lg:flex motion-reduce:transition-none",
+              inspectorOpen ? "opacity-100" : "pointer-events-none opacity-0",
             )}
-          </Button>
-          {renderThread ? renderThread({ historyHeader, historyMessages }) : (
-            <>
-              {historyHeader}
-              {historyMessages}
-              {thread}
-            </>
-          )}
-        </main>
-        {inspectorOpen ? (
-          <>
-            <Separator orientation="vertical" />
-            <RuntimeInspector
-              runtimeArtifact={runtimeArtifact}
-              evidence={runEvidence}
-              onCollapse={() => setInspectorOpen(false)}
-            />
-          </>
-        ) : null}
-      </div>
+            onPointerDown={startBusinessPanelResize}
+          >
+            <div className="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
+              <GripVerticalIcon aria-hidden="true" className="size-2.5" />
+            </div>
+          </div>
+          <div
+            id="business-panel"
+            className={cn(
+              "hidden min-w-0 shrink-0 overflow-hidden border-l bg-background transition-[width] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] lg:block motion-reduce:transition-none",
+              businessPanelResizing && "transition-none",
+            )}
+            style={{ width: inspectorOpen ? businessPanelWidth : 0 }}
+          >
+            <div
+              className={
+                inspectorOpen
+                  ? "size-full opacity-100 transition-opacity duration-200"
+                  : "pointer-events-none size-full opacity-0 transition-opacity duration-150"
+              }
+            >
+              <BusinessEmbedPanel open={inspectorOpen} />
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
       {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
     </SidebarProvider>
-  );
-}
-
-function ThreadHistoryMessages({ detail, status }: { detail?: ThreadDetail; status?: string }) {
-  return (
-    <>
-      {status ? (
-        <div className="rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">{status}</div>
-      ) : null}
-      {detail?.messages.map((message) => (
-        <article
-          key={message.message_id}
-          className={message.role === "user"
-            ? "ml-auto max-w-[78%] rounded-2xl bg-muted px-4 py-3 text-sm"
-            : "mr-auto max-w-[84%] px-2 py-1 text-sm leading-7"}
-        >
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        </article>
-      ))}
-      {detail && detail.messages.length === 0 ? (
-        <div className="rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">该会话暂无消息。</div>
-      ) : null}
-    </>
   );
 }
 

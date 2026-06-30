@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GET } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 
 describe("thread detail proxy route", () => {
   afterEach(() => {
@@ -64,5 +64,57 @@ describe("thread detail proxy route", () => {
         },
       ],
     });
+  });
+
+  it("proxies thread updates to the Python server", async () => {
+    vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        "http://python-server.test/api/threads/thread_recent?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo",
+      );
+      expect(init?.method).toBe("PATCH");
+      expect(init?.body).toBe(JSON.stringify({ status: "archived" }));
+      return Response.json({
+        thread_id: "thread_recent",
+        status: "archived",
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await PATCH(
+      new Request("http://localhost/api/threads/thread_recent?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo", {
+        method: "PATCH",
+        body: JSON.stringify({ status: "archived" }),
+      }),
+      { params: Promise.resolve({ thread_id: "thread_recent" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      thread_id: "thread_recent",
+      status: "archived",
+    });
+  });
+
+  it("proxies thread deletion to the Python server", async () => {
+    vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        "http://python-server.test/api/threads/thread_recent?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo",
+      );
+      expect(init?.method).toBe("DELETE");
+      return Response.json({ thread_id: "thread_recent", deleted: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await DELETE(
+      new Request("http://localhost/api/threads/thread_recent?tenant_id=tenant_demo&workspace_id=workspace_default&user_id=user_demo", {
+        method: "DELETE",
+      }),
+      { params: Promise.resolve({ thread_id: "thread_recent" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ thread_id: "thread_recent", deleted: true });
   });
 });

@@ -65,10 +65,11 @@ function hangingStreamResponse(runId: string) {
   });
 }
 
-async function postChat(text: string) {
+async function postChat(text: string, chatId?: string) {
   return POST(new Request("http://localhost/api/chat", {
     method: "POST",
     body: JSON.stringify({
+      ...(chatId ? { id: chatId } : undefined),
       messages: [
         {
           id: "msg_1",
@@ -139,6 +140,34 @@ describe("assistant-ui chat route", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the assistant-ui chat id as the server thread id when present", async () => {
+    vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
+    const run: MockRun = {
+      status: "completed",
+      intent: "general_chat",
+      response: "ok",
+      run_id: "run_chat_id",
+      thread_id: "thread_assistant_ui",
+      workspace_id: "workspace_default",
+      tool_invocations: ["intent.classify"],
+      artifacts: [],
+      memory_ids: [],
+      audit_event_id: "evt_chat_id",
+      events: ["run.created", "run.completed"],
+    };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        thread_id: "thread_assistant_ui",
+      });
+      return streamResponse(run);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await (await postChat("沿用官方线程 id", "thread_assistant_ui")).text();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does not pretend business plugin requests succeeded in phase one", async () => {
     vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
     const run: MockRun = {
@@ -161,7 +190,9 @@ describe("assistant-ui chat route", () => {
     const body = await response.text();
     expect(body).toContain("intent.classified");
     expect(body).toContain("business_plugin_required");
-    expect(body).toContain("业务插件将在二阶段启用");
+    expect(body).toContain("业务插件");
+    expect(body).toContain("将在二阶");
+    expect(body).toContain("段启用。");
     expect(body).not.toContain("12.36 亿元");
     expect(body).not.toContain("ask_data.query");
   });
@@ -281,6 +312,70 @@ describe("assistant-ui chat route", () => {
     expect(body.indexOf("这是")).toBeLessThan(body.indexOf("模型回答"));
     expect(body.indexOf("模型回答")).toBeLessThan(body.indexOf("model.completed"));
     expect(body).not.toContain("answer_general_chat");
+  });
+
+  it("streams final_result text in chunks when the server does not provide model deltas", async () => {
+    vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
+    const run: MockRun = {
+      run_id: "run_fallback_stream",
+      thread_id: "thread_default",
+      workspace_id: "workspace_default",
+      status: "completed",
+      intent: "general_chat",
+      response: "这是没有模型增量时的兜底流式回答",
+      tool_invocations: ["intent.classify"],
+      artifacts: [],
+      memory_ids: [],
+      audit_event_id: "evt_fallback_stream",
+      events: ["run.created", "model.started", "model.completed", "run.completed"],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => streamResponse(run)));
+
+    const response = await postChat("没有 delta 的回答");
+
+    const body = await response.text();
+    expect(body).toContain("answer_fallback_general_chat");
+    expect(body).toContain("这是没有");
+    expect(body).toContain("模型增量");
+    expect(body).toContain("时的兜底");
+    expect(body).toContain("流式回答");
+    expect(body).not.toContain("answer_general_chat");
+  });
+
+  it("ignores whitespace-only model deltas and still streams the final answer fallback", async () => {
+    vi.stubEnv("WORKBENCH_SERVER_URL", "http://python-server.test");
+    const run: MockRun = {
+      run_id: "run_whitespace_delta",
+      thread_id: "thread_default",
+      workspace_id: "workspace_default",
+      status: "completed",
+      intent: "general_chat",
+      response: "最终回答不能被空白增量吞掉",
+      tool_invocations: ["intent.classify", "conversation.respond"],
+      artifacts: [],
+      memory_ids: [],
+      audit_event_id: "evt_whitespace_delta",
+      events: ["run.created", "model.started", "model.delta", "model.completed", "run.completed"],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response([
+      sse("runtime_event", runtimeEvent("run.created", run.run_id)),
+      sse("runtime_event", runtimeEvent("model.started", run.run_id)),
+      sse("model_delta", modelDelta("\n\n\n", run.run_id)),
+      sse("runtime_event", runtimeEvent("model.completed", run.run_id)),
+      sse("final_result", run),
+      sse("stream_end", { status: "closed" }),
+    ].join(""), {
+      headers: { "Content-Type": "text/event-stream" },
+    })));
+
+    const response = await postChat("空白 delta 回归测试");
+
+    const body = await response.text();
+    expect(body).toContain("answer_fallback_general_chat");
+    expect(body).toContain("最终回答");
+    expect(body).toContain("不能被空");
+    expect(body).toContain("白增量吞");
+    expect(body).not.toContain("answer_streaming_model");
   });
 
   it("keeps streamed assistant text and records cancelled final status", async () => {
@@ -439,7 +534,8 @@ describe("assistant-ui chat route", () => {
     expect(body).toContain('"status":"failed"');
     expect(body).toContain("tool.failed");
     expect(body).toContain("run.failed");
-    expect(body).toContain("工具执行失败");
+    expect(body).toContain("工具执行");
+    expect(body).toContain("失败：d");
     expect(body).toContain("evt_failed");
   });
 

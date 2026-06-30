@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { useMemo } from "react";
+import { useRemoteThreadListRuntime } from "@assistant-ui/react";
 import {
   useChatRuntime,
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk";
 import { Thread } from "@/components/assistant-ui/thread";
 import { WorkbenchShell, type RuntimeArtifact, type RunStepRow } from "@/features/workbench/workbench-shell";
+import { createWorkbenchThreadListAdapter } from "./workbench-thread-adapters";
 
 type AssistantMessageLike = {
   role: string;
@@ -204,93 +206,22 @@ export function normalizeRuntimeArtifactForThreadState(
 }
 
 export const Assistant = () => {
-  const [threadSession, setThreadSession] = useState(0);
-  const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
-
-  return (
-    <AssistantSession
-      key={`${threadSession}:${activeThreadId ?? "new"}`}
-      activeThreadId={activeThreadId}
-      onSelectThread={setActiveThreadId}
-      onNewThread={() => {
-        setActiveThreadId(undefined);
-        setThreadSession((value) => value + 1);
-      }}
-    />
-  );
-};
-
-function AssistantSession({
-  activeThreadId,
-  onSelectThread,
-  onNewThread,
-}: {
-  activeThreadId?: string;
-  onSelectThread: (threadId: string | undefined) => void;
-  onNewThread: () => void;
-}) {
-  const runtime = useChatRuntime({
-    transport: new AssistantChatTransport({
-      api: activeThreadId ? `/api/chat?thread_id=${encodeURIComponent(activeThreadId)}` : "/api/chat",
-    }),
+  const threadListAdapter = useMemo(() => createWorkbenchThreadListAdapter(), []);
+  const runtime = useRemoteThreadListRuntime({
+    adapter: threadListAdapter,
+    allowNesting: true,
+    runtimeHook: function RuntimeHook() {
+      return useChatRuntime({
+        transport: new AssistantChatTransport({
+          api: "/api/chat",
+        }),
+      });
+    },
   });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <WorkbenchRuntimeShell
-        activeThreadId={activeThreadId}
-        onSelectThread={onSelectThread}
-        onNewThread={onNewThread}
-      />
+      <WorkbenchShell renderThread={() => <Thread />} />
     </AssistantRuntimeProvider>
   );
-}
-
-function WorkbenchRuntimeShell({
-  activeThreadId,
-  onSelectThread,
-  onNewThread,
-}: {
-  activeThreadId?: string;
-  onSelectThread: (threadId: string | undefined) => void;
-  onNewThread: () => void;
-}) {
-  const threadIsRunning = useAuiState((state) => state.thread.isRunning);
-  const runtimeArtifactValue = useAuiState((state) => {
-    const artifact = extractRuntimeArtifactFromMessages(state.thread.messages);
-    return artifact ? JSON.stringify(artifact) : undefined;
-  });
-
-  const runtimeArtifact = runtimeArtifactValue
-    ? JSON.parse(runtimeArtifactValue) as {
-        title: string;
-        summary: string;
-        auditEventId: string;
-        events: string[];
-        toolName: string;
-        artifactId?: string;
-        runId?: string;
-        status?: string;
-        latestEvent?: string;
-        liveSteps?: RunStepRow[];
-    }
-    : undefined;
-
-  const normalizedRuntimeArtifact = normalizeRuntimeArtifactForThreadState(runtimeArtifact, threadIsRunning);
-
-  return (
-    <WorkbenchShell
-      runtimeArtifact={normalizedRuntimeArtifact}
-      activeThreadId={activeThreadId}
-      renderThread={({ historyHeader, historyMessages }) => (
-        <Thread
-          historyHeader={historyHeader}
-          historyMessages={historyMessages}
-          suppressWelcome={Boolean(activeThreadId)}
-        />
-      )}
-      onSelectThread={onSelectThread}
-      onNewThread={onNewThread}
-    />
-  );
-}
+};

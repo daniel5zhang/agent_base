@@ -39,7 +39,7 @@ const reasoningVariants = cva("aui-reasoning-root mb-4 w-full", {
     },
   },
   defaultVariants: {
-    variant: "outline",
+    variant: "ghost",
   },
 });
 
@@ -74,6 +74,7 @@ function ReasoningRoot({
   const initialOpenRef = useRef(defaultOpen);
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const lockScroll = useScrollLock(collapsibleRef, ANIMATION_DURATION);
+  const resolvedVariant = variant ?? "ghost";
 
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled
@@ -104,12 +105,12 @@ function ReasoningRoot({
     <Collapsible
       ref={collapsibleRef}
       data-slot="reasoning-root"
-      data-variant={variant}
+      data-variant={resolvedVariant}
       open={isOpen}
       onOpenChange={handleOpenChange}
       className={cn(
         "group/reasoning-root",
-        reasoningVariants({ variant, className }),
+        reasoningVariants({ variant: resolvedVariant, className }),
       )}
       style={
         {
@@ -177,6 +178,8 @@ function ReasoningTrigger({
   return (
     <CollapsibleTrigger
       data-slot="reasoning-trigger"
+      data-active={active ? "true" : "false"}
+      aria-busy={active ? "true" : undefined}
       className={cn(
         "aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground flex max-w-[75%] origin-left items-center gap-2 py-1.5 text-sm transition-[color,scale] active:scale-[0.98]",
         className,
@@ -185,7 +188,10 @@ function ReasoningTrigger({
     >
       <BrainIcon
         data-slot="reasoning-trigger-icon"
-        className="aui-reasoning-trigger-icon size-4 shrink-0"
+        className={cn(
+          "aui-reasoning-trigger-icon size-4 shrink-0",
+          active && "animate-pulse",
+        )}
       />
       <span
         data-slot="reasoning-trigger-label"
@@ -315,7 +321,7 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({
   });
 
   return (
-    <ReasoningRoot streaming={isReasoningStreaming}>
+    <ReasoningRoot streaming={isReasoningStreaming} variant="ghost">
       <ReasoningTrigger active={isReasoningStreaming} />
       <ReasoningContent aria-busy={isReasoningStreaming}>
         <ReasoningText>{children}</ReasoningText>

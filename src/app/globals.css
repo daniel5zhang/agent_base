@@ -128,4 +128,28 @@
   html {
     @apply font-sans;
   }
+
+  .aui-thread-viewport {
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 18%, transparent)
+      transparent;
+    scrollbar-width: thin;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 16%, transparent);
+    border: 3px solid var(--background);
+    border-radius: 999px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--muted-foreground) 24%, transparent);
+  }
 }
