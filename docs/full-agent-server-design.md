@@ -621,6 +621,87 @@ model tool_call
   → Artifact / ToolResult
 ```
 
+### 10.5 Connector Runtime 治理原则
+
+内部业务 Connector 支持三档接入：
+
+```text
+标准 Connector：
+业务系统提供标准 API，工作台服务端直接调用。
+
+轻改造 Connector：
+业务系统提供有限 API，工作台做适配层。
+
+人工/半自动 Connector：
+系统暂未开放 API，只生成操作指引、跳转、表单草稿，不做自动操作。
+```
+
+第一阶段不支持核心业务系统 RPA / UI 自动化。
+
+执行位置：
+
+```text
+内部业务 Connector：统一服务端执行。
+外部通用插件：优先服务端执行。
+低风险本地文件能力：允许本地执行。
+MCP Server：作为外部工具协议适配层接入，但必须经过 ToolRuntime 和 PermissionService。
+```
+
+授权方式：
+
+```text
+服务端托管凭据
+用户 OAuth / SSO 授权
+企业 IdP 集中授权
+系统账号 + 用户身份透传
+API Key / Secret
+Custom Headers
+```
+
+所有凭据由服务端保存，前端不保存密钥。
+
+Connector 统一返回结构：
+
+```json
+{
+  "status": "completed | failed | partial | blocked | approval_required",
+  "summary": "给主对话展示的摘要",
+  "data": {},
+  "artifacts": [],
+  "audit_event_id": "evt_xxx",
+  "permission_decision": {},
+  "next_actions": [],
+  "raw_ref": "原始响应引用"
+}
+```
+
+Connector Binding 必备治理字段：
+
+```text
+connector_id
+plugin_id
+tenant_id
+environment
+base_url
+auth_type
+credential_ref
+allowed_operations
+data_scope_policy_id
+timeout_seconds
+retry_policy
+rate_limit
+risk_tier
+audit_policy
+enabled
+```
+
+ToolPool 动态过滤：
+
+```text
+每次 Agent run 前，根据 tenant、user、role、workspace、plugin visibility、authorization status、data permission、risk tier、approval policy 生成模型可见工具。
+不把系统全部工具一次性暴露给模型。
+```
+
 ## 11. 模型服务设计
 
 当前 `llm.py` 是 OpenAI-compatible 单实现。目标是抽象为：

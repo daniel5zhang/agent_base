@@ -498,16 +498,60 @@ Permission / Approval / Audit：金融企业场景必须内置，不能作为可
 
 仍需补齐：
 
-- 内部业务 Connector 协议；
-- 外部通用 Connector 协议；
-- Connector 鉴权方式；
-- Connector 超时和重试；
-- Connector 并发限制；
-- Connector 结果标准化；
-- Connector 审计；
-- Connector 错误码；
-- 现有业务系统低改造接入规范；
-- 无接口系统的接入边界。
+- 内部业务 Connector 协议；已确认：支持标准 Connector、轻改造 Connector、人工/半自动 Connector 三档。
+- 外部通用 Connector 协议；已确认：外部通用插件优先服务端执行，低风险本地文件能力允许本地执行；MCP Server 作为外部工具协议适配层接入，但必须经过 ToolRuntime 和 PermissionService。
+- Connector 鉴权方式；已确认：第一批支持服务端托管凭据、用户 OAuth/SSO 授权、企业 IdP 集中授权、系统账号 + 用户身份透传、API Key/Secret、Custom Headers；所有凭据由服务端保存，前端不保存密钥。
+- Connector 超时和重试；已确认：Connector Binding 必须包含 `timeout_seconds` 和 `retry_policy`。
+- Connector 并发限制；已确认：Connector Binding 必须包含 `rate_limit`，执行时由 ToolRuntime 统一治理。
+- Connector 结果标准化；已确认：统一返回 `status`、`summary`、`data`、`artifacts`、`audit_event_id`、`permission_decision`、`next_actions`、`raw_ref`。
+- Connector 审计；已确认：Connector Binding 必须包含 `audit_policy`，每次执行必须生成审计事件。
+- Connector 错误码；待细化。
+- 现有业务系统低改造接入规范；已确认：支持轻改造 Connector，由工作台服务端做适配层。
+- 无接口系统的接入边界；已确认：采用人工/半自动 Connector，只生成操作指引、跳转、表单草稿，不做自动操作。
+
+已确认第一阶段不支持核心业务系统 RPA / UI 自动化。
+
+Connector 统一返回结构：
+
+```json
+{
+  "status": "completed | failed | partial | blocked | approval_required",
+  "summary": "给主对话展示的摘要",
+  "data": {},
+  "artifacts": [],
+  "audit_event_id": "evt_xxx",
+  "permission_decision": {},
+  "next_actions": [],
+  "raw_ref": "原始响应引用"
+}
+```
+
+Connector Binding 必备治理字段：
+
+```text
+connector_id
+plugin_id
+tenant_id
+environment
+base_url
+auth_type
+credential_ref
+allowed_operations
+data_scope_policy_id
+timeout_seconds
+retry_policy
+rate_limit
+risk_tier
+audit_policy
+enabled
+```
+
+ToolPool 动态过滤已确认：
+
+```text
+每次 Agent run 前，根据 tenant、user、role、workspace、plugin visibility、authorization status、data permission、risk tier、approval policy 生成模型可见工具。
+不把系统全部工具一次性暴露给模型。
+```
 
 是否需要用户确认：是。尤其是内部业务系统改造标准。
 
