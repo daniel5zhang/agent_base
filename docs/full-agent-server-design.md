@@ -30,6 +30,40 @@
 
 `claude-code-main` 是源码快照，不作为直接依赖。参考方式是吸收它的 Agent Runtime 思想，按 Python/FastAPI/SQLite 技术栈重建。
 
+插件体系主参考采用 Codex-style Plugin Architecture，但不直接照搬。工作台需要落地为金融企业版本：
+
+```text
+Enterprise Plugin Architecture
+  = Codex Plugin model
+  + Enterprise IAM
+  + RBAC / ABAC
+  + Data Permission
+  + Approval Workflow
+  + Audit / Retention
+  + Connector Runtime
+  + Business Artifact Renderer
+```
+
+参考边界：
+
+```text
+Codex 插件体系：主参考，负责插件作为能力发布、安装、授权、启停、UI 和版本管理单元。
+MCP：外部工具协议和标准工具生态参考。
+Dify：插件市场、OAuth、工具配置和工具导入体验参考。
+claude-code-main：Agent Runtime、QueryLoop、Tool 执行、权限判断和工具结果回写参考。
+```
+
+工作台插件标准应明确：
+
+```text
+Plugin Package：发布、安装、授权、启停、版本、依赖、UI、配置。
+Skill：告诉 Agent 什么时候使用能力、如何澄清、如何解释结果。
+Tool / Capability：模型可调用能力、schema、风险、权限、结果。
+Connector：服务端实际连接业务系统或外部系统的执行层。
+UI Renderer：右侧业务面板的业务 Artifact 渲染器。
+Permission / Approval / Audit：金融企业场景必须内置，不能作为可选能力。
+```
+
 | 参考项目能力 | 参考文件 | 工作台服务端目标 |
 | --- | --- | --- |
 | 会话级 QueryEngine | `src/QueryEngine.ts` | `AgentSessionRuntime`，每个 thread 维护上下文、工具、权限、usage、abort |

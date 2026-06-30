@@ -462,6 +462,40 @@ RBAC 负责角色权限，ABAC 负责属性权限和数据范围权限。
 
 ## 10. Connector Runtime 缺口
 
+已确认插件体系主参考：
+
+```text
+以 Codex 插件体系作为主参考。
+MCP 作为外部工具协议参考。
+Dify 作为插件市场、OAuth、工具配置参考。
+claude-code-main 作为 Agent Runtime 和工具执行细节参考。
+```
+
+工作台不直接照搬 Codex，而是采用金融企业增强版：
+
+```text
+Enterprise Plugin Architecture
+  = Codex Plugin model
+  + Enterprise IAM
+  + RBAC / ABAC
+  + Data Permission
+  + Approval Workflow
+  + Audit / Retention
+  + Connector Runtime
+  + Business Artifact Renderer
+```
+
+插件标准分层已确认：
+
+```text
+Plugin Package：发布、安装、授权、启停、版本、依赖、UI、配置。
+Skill：告诉 Agent 什么时候使用能力、如何澄清、如何解释结果。
+Tool / Capability：模型可调用能力、schema、风险、权限、结果。
+Connector：服务端实际连接业务系统或外部系统的执行层。
+UI Renderer：右侧业务面板的业务 Artifact 渲染器。
+Permission / Approval / Audit：金融企业场景必须内置，不能作为可选能力。
+```
+
 仍需补齐：
 
 - 内部业务 Connector 协议；
