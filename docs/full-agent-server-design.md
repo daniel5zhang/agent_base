@@ -830,6 +830,13 @@ updated_at
 - 用户点击主对话结果卡片后，右侧业务面板打开或切换到对应 Artifact；
 - 同一会话内多次查询应形成多条结果记录，不能简单覆盖；第一次查询、第二次调整条件查询都应保留对应卡片和 Artifact；
 - Artifact 下载按数据级别和权限分级控制：普通文本/小表格允许复制，业务查询结果下载需要权限判断和审计，敏感数据/明细数据默认不允许下载且需审批；
+- Tab 可以关闭，但关闭不删除 Artifact；主对话结果卡片可重新打开对应 Artifact；如果 Artifact 有未保存表单内容，关闭前提示；
+- Artifact 默认不支持外部分享，仅支持当前会话内通过主对话卡片重新打开；后续如果需要分享，必须经过权限判断和审计；
+- renderer 由插件 manifest 声明，服务端返回 `renderer_hint`，前端根据 `renderer_hint` 找到对应业务组件；找不到 renderer 时展示通用 JSON / 表格 fallback；
+- 右侧面板空状态提示“从对话中的结果卡片打开业务内容”；
+- Artifact 加载失败时展示错误原因、重试按钮、审计/事件编号；权限不足时展示权限不足和申请入口；
+- 审计编号固定展示在 Artifact 详情顶部元信息区和底部审计区；
+- 第一批默认组件包括 Table、Metric、Chart、Form、Approval、QueryPlan、AuditInfo、ErrorState；
 - 如果新增 Artifact 类型需要新 UI renderer，必须先与用户确认前端修改内容。
 
 建议插件 manifest 增加 UI 分流声明：
