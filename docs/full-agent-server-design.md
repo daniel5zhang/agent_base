@@ -1107,7 +1107,7 @@ SQLite 阶段继续 `create_all`，进入试点前引入 Alembic。
 
 以下内容会影响前端或业务交互，需要单独确认后开发：
 
-1. `approval.required` 是否在右侧业务面板新增审批 Tab；已确认：需要。Phase 1C 先做 mock 审批 Tab，后续接钉钉、企业微信或自建审批。第一批审批对象包括数据权限申请、插件授权申请、高风险工具调用申请、数据导出申请、跨机构数据访问申请；模型外发敏感数据申请暂不纳入第一批，后续依赖数据分类分级和 DLP 策略再加入。Phase 1C mock 审批需要本地模拟通过/拒绝，并支持恢复原 Agent run；审批通过后默认不自动恢复，需要用户点击“继续执行”。
+1. `approval.required` 是否在右侧业务面板新增审批 Tab；已确认：需要。Phase 1C 先做 mock 审批 Tab，后续接自建审批、钉钉、企业微信。第一批审批对象包括数据权限申请、插件授权申请、高风险工具调用申请、数据导出申请、跨机构数据访问申请；模型外发敏感数据申请暂不纳入第一批，后续依赖数据分类分级和 DLP 策略再加入。Phase 1C mock 审批需要本地模拟通过/拒绝，并支持恢复原 Agent run；审批通过后默认不自动恢复，需要用户点击“继续执行”；审批拒绝后允许修改范围重新提交；审批默认 7 天过期且可配置；主对话展示审批摘要卡片，右侧审批 Tab 长期保留完整审批详情。审批 provider 优先级为自建审批、钉钉、企业微信，并保留 provider 抽象。
 2. 插件运行结果是否需要新增业务 Tab renderer；已确认：按 Artifact 类型和复杂度分流。主对话展示摘要和过程，右侧业务面板展示结构化、可操作、可审计、可持续查看的业务结果。内部业务插件默认 `both`，由 plugin manifest 的 `ui.result_surface`、`ui.renderer`、`ui.open_policy` 控制。
 3. Thread History 是否从 `Message` 切换为 `TranscriptEvent`；已确认：Phase 1B 不切换。当前前端继续使用 assistant-ui `react-ai-sdk` / `UIMessage` 路线，`Message` 继续作为前端历史消息来源。服务端新增 `TranscriptEvent`，用于 Agent Runtime、审计、工具回放和上下文恢复，并提供 `TranscriptEvent -> Message/UIMessage` 投影能力。前端 Runtime 是否迁移到 `AssistantTransport` 或 `AG-UI` 保留待定，等服务端能力完成后再评估。
 4. 设置页是否要暴露多 Model Provider 配置；已确认：采用 UI 可配置方案。入口放在左下角“设置与模型”。设置页需要支持新增、编辑、禁用、删除多个 Model Provider，字段包括 provider 名称、provider 类型、OpenAI-compatible base URL、API Key、模型列表、默认模型、启用状态和适用范围。角色权限为：普通用户只能选择已授权模型，不能新增 Provider，不能查看 API Key；团队管理员可为团队设置默认模型；租户管理员可新增、编辑、禁用租户级 Provider；系统管理员可管理全局 Provider 和系统默认模型。模型列表支持手动填写；如果 Provider 支持 `/models`，可拉取模型列表。API Key 只能提交给服务端保存，前端不得持久化明文密钥；服务端需要提供密钥加密、脱敏展示、连通性测试、租户级/用户级授权和审计记录。Phase 1B 先实现后端 `ModelProvider` 抽象和配置 API，前端设置页改动需单独列出方案并再次确认后开发。
