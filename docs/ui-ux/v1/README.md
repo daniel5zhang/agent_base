@@ -35,6 +35,8 @@ v1 的目标是把已经确认的 Phase A-G 平台能力，落成开发前可执
 | `page-specs.md` | 页面规格与开发约束，拆解组件、数据接口和验收条件 |
 | `pre-development-review.md` | UI/UX 开发前评审结论，确认开发准入、优先级和暂缓项 |
 
+全量 Phase A-H 的跨阶段开发评审见：[`../../full-platform-phase-development-review.md`](../../full-platform-phase-development-review.md)
+
 ## 3. 当前页面证据
 
 以下截图由本地运行的当前系统生成，用于作为 v1 设计对照基线。

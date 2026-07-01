@@ -34,3 +34,14 @@
 - 支撑开发前 UI/UX 评审。
 - 明确哪些区域用 assistant-ui 官方能力，哪些区域使用 shadcn/ui 或自定义组件。
 - 明确 Phase A 可以开工，以及哪些能力必须暂缓到对应 Phase。
+
+### v1 补充 - 全量 Phase 评审
+
+新增：
+
+- `../full-platform-phase-development-review.md`：Phase A-H 全量开发前评审。
+
+用途：
+
+- 明确每个 Phase 的开发成熟度、依赖、风险和开工条件。
+- 避免把“设计满足”误解为 A-H 可以同时开工。

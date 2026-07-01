@@ -6,6 +6,7 @@
 参考架构：Codex-style Plugin Architecture + 金融企业权限、审批、审计、Connector Runtime
 
 开发前 UI/UX 设计基线：[`docs/ui-ux/v1/README.md`](./ui-ux/v1/README.md)
+全量 Phase 开发前评审：[`docs/full-platform-phase-development-review.md`](./full-platform-phase-development-review.md)
 
 ## 1. 目标
 
