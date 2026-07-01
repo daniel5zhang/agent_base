@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 实现右侧业务面板 Artifact Renderer，让插件业务结果、审批、查询计划、图表、表格、表单、审计信息可以从主对话结果卡片打开并按会话隔离。
+**Goal:** 实现右侧业务面板 Artifact Renderer，让插件业务结果、查询计划、图表、表格、表单、审计信息可以从主对话结果卡片打开并按会话隔离。审批中心不放右侧业务面板。
 
 **Architecture:** 后端提供 Artifact、版本、权限、下载申请和 renderer hint；主对话只展示结果链接卡片，右侧业务面板按 `artifact_id` 渲染。前端必须优先使用 assistant-ui 官方 Thread 外壳；右侧业务面板作为外挂区域，使用 assistant-ui/shadcn 技术栈实现。
 
@@ -20,8 +20,9 @@
 - 点击卡片打开右侧对应 Artifact。
 - 多 Tab，Tab 可关闭但不删除 Artifact。
 - 通用 fallback renderer。
-- 第一批 renderer：Table, Metric, Chart, Form, Approval, QueryPlan, AuditInfo, ErrorState。
-- 下载/复制权限判断和审计。
+- 第一批 renderer：Table, Metric, Chart, Form, QueryPlan, AuditInfo, ErrorState。
+- 下载、导出、复制权限判断和审计。
+- 相同用户、相同 Artifact 内容、相同权限范围、相同操作类型下，已通过的权限审核可以复用，不需要重复审批。
 
 ### Out of scope
 
@@ -29,6 +30,7 @@
 - 跨会话共享 Artifact。
 - 高级图表编辑器。
 - 大文件下载服务。
+- 审批中心详情；审批中心属于设置页面。
 - 权限外发审批之外的复杂数据脱敏策略；沿用 Phase B/F。
 
 ## 1. Target File Structure
@@ -66,7 +68,6 @@ src/components/business-panel/renderers/table-renderer.tsx
 src/components/business-panel/renderers/metric-renderer.tsx
 src/components/business-panel/renderers/chart-renderer.tsx
 src/components/business-panel/renderers/form-renderer.tsx
-src/components/business-panel/renderers/approval-renderer.tsx
 src/components/business-panel/renderers/query-plan-renderer.tsx
 src/components/business-panel/renderers/audit-info-renderer.tsx
 src/components/business-panel/renderers/error-state-renderer.tsx
@@ -127,6 +128,32 @@ permission_decision_id
 approval_id
 audit_event_id
 created_at
+```
+
+Permission review cache:
+
+```text
+artifact_permission_grant_id
+tenant_id
+user_id
+artifact_id
+artifact_content_hash
+operation: copy | download | export
+permission_scope_hash
+approval_id
+decision: allowed | denied | approval_required
+expires_at
+created_at
+```
+
+Rules:
+
+```text
+1. 首次复制、下载、导出必须进行权限判断。
+2. 如果需要审批，则走 Phase F 审批中心。
+3. 如果同一用户、同一 Artifact 内容 hash、同一权限范围 hash、同一操作类型已有有效通过记录，则复用，不重复审批。
+4. Artifact 内容变更、权限范围变更、操作类型变更、授权过期，必须重新判断。
+5. 每次复用授权仍写审计事件，标记 reused_grant_id。
 ```
 
 ## 3. Renderer Payload Contracts
@@ -224,6 +251,51 @@ Backend Runtime should add assistant message part or metadata:
 
 Current frontend may not support parts. If not, Phase G backend can include a markdown-safe link text in `Message.content`, while frontend migration to rich card requires confirmation.
 
+## 5.1 Controlled AI Dynamic UI Strategy
+
+The frontend framework must support AI-driven dynamic UI through controlled Artifact schemas, not arbitrary model-generated React code.
+
+Approved approach:
+
+```text
+Model / Plugin / Connector
+  -> structured Artifact schema
+  -> backend validates schema and permission
+  -> backend returns renderer_hint
+  -> frontend maps renderer_hint to whitelisted renderer
+  -> right business panel renders UI
+```
+
+Allowed dynamic UI:
+
+```text
+metric
+table
+chart
+form
+query_plan
+audit_info
+error_state
+json_fallback
+```
+
+Not allowed in Phase G:
+
+```text
+AI-generated React/JS code execution
+AI-generated arbitrary HTML with scripts
+Unregistered renderer_hint
+Client-side permission bypass
+```
+
+If a renderer is not registered:
+
+```text
+1. Show fallback JSON/table renderer.
+2. Display renderer_hint and artifact_id for diagnostics.
+3. Do not execute arbitrary code.
+```
+
 ## 6. Implementation Tasks
 
 ### Task 1: Backend artifact models and service
@@ -286,19 +358,21 @@ Current frontend may not support parts. If not, Phase G backend can include a ma
 - [ ] Run backend regression.
 - [ ] Commit: `feat: create artifacts from connector results`.
 
-### Task 5: Frontend confirmation checkpoint
+### Task 5: Frontend implementation checkpoint
 
-Before writing frontend code, present these proposed changes to user:
+Phase G UI decision is confirmed:
 
 ```text
-1. 新增主对话 ArtifactLinkCard，显示标题、摘要、审计编号，点击打开右侧面板
-2. 右侧业务面板保留当前外挂区域，新增多 Tab 状态
-3. Tab 关闭只关闭显示，不删除 Artifact
-4. renderer_hint 映射到 shadcn/assistant-ui 风格组件
-5. fallback 展示 JSON/Table
+1. 右侧面板只承载业务 Artifact，属于前端框架中的业务嵌入区域。
+2. 主对话结果卡片点击后打开右侧 Artifact。
+3. 多次查询每次生成独立 Artifact 和独立卡片。
+4. Tab 关闭只关闭显示，不删除 Artifact。
+5. 下载、导出、复制都需要权限判断和审计。
+6. 相同内容、相同用户、相同权限范围、相同操作类型可复用已通过审核，不重复审核。
+7. AI 动态 UI 使用受控 Artifact schema + renderer_hint 白名单，不允许 AI 直接生成并执行 React 代码。
 ```
 
-Stop until confirmed.
+Frontend implementation can proceed under these constraints.
 
 ### Task 6: Frontend artifact link card
 
@@ -325,6 +399,7 @@ Stop until confirmed.
 - [ ] Fetch artifact by id.
 - [ ] Render by `renderer_hint`.
 - [ ] Implement fallback JSON renderer.
+- [ ] Reject unregistered renderer hints and fall back safely.
 - [ ] Show audit id top meta and bottom audit area.
 - [ ] Handle error state with retry and audit/event id.
 - [ ] Run frontend tests and Playwright smoke.
@@ -341,12 +416,14 @@ Stop until confirmed.
 - [ ] Renderer fallback works.
 - [ ] Audit id is visible.
 - [ ] Download request is permissioned and audited.
+- [ ] Export and copy requests are permissioned and audited.
+- [ ] Same-content permission review can be reused with audit.
 - [ ] Permission insufficient state shows application entry.
 - [ ] Existing Phase A-F tests pass.
 
 ## 8. Frontend Implementation Rule
 
-Phase G includes frontend, but only after explicit confirmation. The priority order remains:
+Phase G includes frontend. The priority order remains:
 
 ```text
 1. assistant-ui official shell and components
@@ -355,6 +432,8 @@ Phase G includes frontend, but only after explicit confirmation. The priority or
 ```
 
 Do not replace assistant-ui Thread shell.
+
+Do not allow AI-generated arbitrary frontend code execution. Dynamic UI must be rendered through whitelisted Artifact Renderer components.
 
 ## 9. Validation Commands
 
@@ -387,4 +466,3 @@ Playwright smoke after frontend:
 8. Click card again
 9. Verify artifact reopens
 ```
-

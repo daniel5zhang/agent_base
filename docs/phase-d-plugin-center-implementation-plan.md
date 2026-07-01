@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 建设 Codex-style 插件中心，支持插件发布、可见性、安装、授权、启停、升级、能力暴露、Skill 指令和审计。
+**Goal:** 建设 Codex-style 插件中心，支持插件发布、可见性、授权、启停、升级、能力暴露、Skill 指令和审计。Web 形态用户侧弱化“安装”，以“申请授权 / 启用 / 停用 / 使用”为主。
 
 **Architecture:** 插件分为 `PluginPackage`、`Skill`、`Tool/Capability`、`ConnectorBinding`、`UIRenderer`、`Permission/Approval/Audit` 六层。Phase D 只实现插件中心和能力注册，不实现真实 Connector 调用；Connector Runtime 在 Phase E 接入。
 
-**Tech Stack:** Python 3.11, FastAPI, SQLAlchemy, SQLite, pytest. Frontend later uses assistant-ui/shadcn; UI implementation需确认。
+**Tech Stack:** Python 3.11, FastAPI, SQLAlchemy, SQLite, pytest. Frontend uses assistant-ui/shadcn inside the confirmed Codex-style settings page.
 
 ---
 
@@ -16,7 +16,8 @@
 
 - 插件包、版本、manifest。
 - 插件目录 catalog。
-- 插件安装、授权、启停、升级状态机。
+- 服务端发布和管理员启用插件。
+- 用户侧授权、启停、使用状态机。
 - 插件 Skill 文本和工具能力 schema。
 - 插件可见性规则和角色/工作空间过滤。
 - 插件审计事件。
@@ -27,7 +28,7 @@
 - 插件包真实下载、签名验签、沙箱解压。
 - 外部插件市场。
 - 真实业务 Connector 执行。
-- 插件前端中心 UI 自动开发；需要确认 UI 后再做。
+- 插件前端中心 UI 自动开发；已确认 UI 方向为设置页面菜单中的完整页面。
 
 ## 1. Target File Structure
 
@@ -110,7 +111,7 @@ Create:
 
 ```text
 PluginVersion
-PluginInstallation
+PluginEnablement
 PluginAuthorization
 PluginVisibilityRule
 PluginCapability
@@ -132,7 +133,6 @@ Status values:
 ```text
 published
 visible
-installed
 authorization_required
 authorized
 enabled
@@ -145,7 +145,6 @@ removed
 User-visible status:
 
 ```text
-可安装
 待授权
 已启用
 已停用
@@ -158,7 +157,6 @@ User-visible status:
 ```text
 GET    /api/plugins/catalog
 GET    /api/plugins/{plugin_id}
-POST   /api/plugins/{plugin_id}/install
 POST   /api/plugins/{plugin_id}/authorize
 POST   /api/plugins/{plugin_id}/enable
 POST   /api/plugins/{plugin_id}/disable
@@ -187,7 +185,7 @@ Catalog response includes:
       "plugin_id": "ask-data",
       "name": "问数插件",
       "plugin_type": "internal_business",
-      "status": "enabled",
+  "status": "enabled",
       "user_visible_status": "已启用",
       "capabilities": ["ask_data.query"],
       "risk_tier": "L1",
@@ -202,11 +200,12 @@ Catalog response includes:
 ```text
 ordinary_user:
   - view visible plugins
-  - enable/disable personal external/general plugin if allowed
   - request authorization
-  - cannot install tenant internal plugin
+  - enable/disable authorized plugins if allowed
+  - use authorized plugins
+  - cannot publish or tenant-enable internal business plugins
 tenant_admin:
-  - install tenant plugin
+  - tenant-enable plugin released by system/admin
   - authorize tenant plugin
   - enable/disable tenant plugin
 system_admin:
@@ -219,7 +218,7 @@ Every lifecycle operation writes:
 
 ```text
 plugin.package_created
-plugin.installed
+plugin.tenant_enabled
 plugin.authorization_requested
 plugin.authorized
 plugin.enabled
@@ -273,7 +272,7 @@ plugin.deprecated
 - [ ] Run tests.
 - [ ] Commit: `feat: add plugin registry and ask data seed`.
 
-### Task 4: Installation and authorization service
+### Task 4: Enablement and authorization service
 
 **Files:**
 
@@ -281,12 +280,12 @@ plugin.deprecated
 - Create: `backend/app/plugins/authorization.py`
 - Test: `backend/tests/test_plugin_lifecycle.py`
 
-- [ ] Write tests for install, authorize, enable, disable, upgrade.
+- [ ] Write tests for tenant enablement, user authorization request, authorize, enable, disable, upgrade.
 - [ ] Enforce status transitions.
 - [ ] Enforce Phase B permissions.
 - [ ] Write audit events.
 - [ ] Run tests.
-- [ ] Commit: `feat: add plugin installation authorization service`.
+- [ ] Commit: `feat: add plugin enablement authorization service`.
 
 ### Task 5: Catalog filtering
 
@@ -297,7 +296,7 @@ plugin.deprecated
 - Test: `backend/tests/test_plugin_catalog_routes.py`
 
 - [ ] Write tests: `data_analyst` sees `ask-data`, non-matching role does not.
-- [ ] Filter by tenant, workspace, role, installation, authorization, enabled status.
+- [ ] Filter by tenant, workspace, role, tenant enablement, authorization, enabled status.
 - [ ] Do not expose unauthorized internal business plugin in `+` menu.
 - [ ] Preserve current `/api/plugins/catalog` compatibility.
 - [ ] Run tests.
@@ -333,26 +332,32 @@ plugin.deprecated
 
 ## 7. Frontend Impact Gate
 
-Plugin center UI requires confirmation before implementation.
-
-Questions to confirm before UI coding:
+Plugin center UI decision is confirmed:
 
 ```text
-1. 左侧“插件”入口是否打开独立中心页还是右侧抽屉
-2. 插件列表分区使用 tabs 还是 sidebar section
-3. 普通用户看到安装按钮还是申请按钮
-4. 管理员管理是否第一版展示
+1. 插件中心作为设置页面里的一个菜单，打开完整页面，形态类似 Codex。
+2. 插件主视图按业务类型组织，例如问数、理赔、投保、查询、办公、本地文件、外部通用。
+3. 全部插件、已授权、待授权、可升级、已停用、管理员管理、审计记录作为筛选条件，不作为主分区。
+4. Web 形态普通用户不显示“安装”，只显示“申请授权 / 启用 / 停用 / 使用”。
+5. 管理员管理和审计记录第一版展示。
 ```
 
-Backend can proceed without frontend UI.
+Frontend implementation can proceed under these constraints. If the UI needs偏离设置页完整页面或 Codex-style，需要重新确认。
+
+Implementation notes:
+
+```text
+1. Backend can keep `PluginInstallation` table name if already implemented, but user-facing wording must be `授权/启用/使用`.
+2. API can keep admin installation semantics internally, but frontend must not expose install to ordinary web users.
+```
 
 ## 8. Acceptance Checklist
 
 - [ ] `ask-data` plugin seeded.
 - [ ] Catalog filters by tenant/workspace/role/authorization.
 - [ ] Unauthorized plugin not shown in `+` menu.
-- [ ] Tenant admin can install internal business plugin.
-- [ ] Ordinary user cannot install tenant plugin.
+- [ ] Tenant admin can tenant-enable internal business plugin released by admin/system.
+- [ ] Ordinary user cannot tenant-enable or publish plugin.
 - [ ] Enable/disable writes audit.
 - [ ] Plugin Skill can be loaded into runtime context.
 - [ ] Plugin capabilities can be converted into ToolPool entries.

@@ -4,7 +4,7 @@
 
 **Goal:** 实现审批申请、审批流转、审批详情、mock 审批、拒绝重提和审批通过后手动恢复执行闭环。
 
-**Architecture:** 审批中心采用 Provider 抽象，优先自建审批，预留钉钉和企业微信 Provider。Phase F 后端实现完整审批状态机和 resume token；前端审批 Tab、主对话审批卡片属于 UI 变更，需要确认后实施。
+**Architecture:** 审批中心采用 Provider 抽象，优先自建审批，预留钉钉和企业微信 Provider。Phase F 后端实现完整审批状态机和 resume token；前端审批中心集成在类似 Codex 的设置页面中。主对话只展示审批摘要卡片，不使用右侧业务 Tab 承载审批中心。
 
 **Tech Stack:** Python 3.11, FastAPI, SQLAlchemy, SQLite, pytest.
 
@@ -28,7 +28,7 @@
 - 模型外发敏感数据审批。
 - 真实钉钉/企业微信 API 对接。
 - 复杂多级审批流设计器。
-- 前端审批 Tab 自动开发。
+- 审批详情右侧业务面板；审批中心统一放在设置页面。
 
 ## 1. Target File Structure
 
@@ -280,17 +280,18 @@ Resume response:
 
 ## 6. Frontend Impact Gate
 
-Before UI implementation, confirm:
+Phase F UI decision is confirmed:
 
 ```text
-1. 主对话审批摘要卡片样式
-2. 右侧审批 Tab 内容结构
-3. 审批通过后“继续执行”按钮位置
-4. 拒绝后重新提交表单字段
-5. 审批列表是否进入插件中心/设置页/独立入口
+1. 审批中心集成在设置页面中，形态类似 Codex。
+2. 审批详情不使用右侧业务面板。
+3. 主对话可以展示审批摘要卡片，点击后进入设置页审批详情。
+4. 审批通过后不自动恢复，用户手动点击“继续执行”。
+5. 审批拒绝后允许修改范围重新提交。
+6. 第一版操作按钮支持：通过、拒绝、重新提交、继续执行。
 ```
 
-No frontend changes without confirmation.
+Frontend implementation can proceed under these constraints. 右侧业务面板只用于业务 Artifact，不承载审批中心。
 
 ## 7. Acceptance Checklist
 
@@ -299,6 +300,8 @@ No frontend changes without confirmation.
 - [ ] Approved request does not auto-resume.
 - [ ] User clicks resume-run and execution resumes.
 - [ ] Rejected request can resubmit with changed scope.
+- [ ] Approval summary card in main chat links to settings approval detail page.
+- [ ] Approval detail is not rendered in the right business panel.
 - [ ] Expired request cannot approve.
 - [ ] Every approval transition writes audit.
 - [ ] DingTalk/WeCom provider stubs exist.
@@ -313,4 +316,3 @@ pytest -q
 cd ..
 python3 -m py_compile backend/app/*.py backend/app/routes/*.py backend/app/approvals/*.py backend/app/approvals/providers/*.py
 ```
-

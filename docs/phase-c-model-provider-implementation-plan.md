@@ -4,7 +4,7 @@
 
 **Goal:** 实现多 Model Provider 配置、密钥服务端保存、模型列表管理、连通性测试和授权可见模型能力。
 
-**Architecture:** Phase C 在 Phase A 的 `ModelProviderRegistry` 基础上落地持久化 Provider 配置。密钥不进入前端持久化，后端只返回脱敏信息。前端设置页属于本 Phase 的前端变更，开发前需向用户确认具体 UI；本计划先完成后端详细设计和可测试接口。
+**Architecture:** Phase C 在 Phase A 的 `ModelProviderRegistry` 基础上落地持久化 Provider 配置。密钥不进入前端持久化，默认脱敏展示；具备权限的管理员可以切换查看明文，查看明文必须审计。模型设置使用类似 Codex 的完整设置页面，并优先使用 assistant-ui/shadcn 技术栈实现。
 
 **Tech Stack:** Python 3.11, FastAPI, SQLAlchemy, SQLite, pytest, OpenAI-compatible API.
 
@@ -16,7 +16,7 @@
 
 - Provider CRUD。
 - OpenAI-compatible Provider 类型。
-- API Key 服务端保存和脱敏返回。
+- API Key 服务端保存，默认脱敏返回；有权限时可临时查看明文。
 - 手动模型列表。
 - 支持 provider `/models` 时刷新模型。
 - Provider 连通性测试。
@@ -25,10 +25,10 @@
 
 ### Out of scope
 
-- 前端设置页直接开发；需要单独确认 UI。
+- 前端设置页代码不包含在后端任务中；UI 方向已确认，进入前端任务时按本文件第 6 节执行。
 - 企业级 KMS/HSM。
 - 费用精确计算。
-- 非 OpenAI-compatible 私有 SDK。
+- 非 OpenAI-compatible 私有 SDK；第一版只支持 OpenAI-compatible。
 - 模型路由策略、成本优化策略。
 
 ## 1. Target File Structure
@@ -122,7 +122,9 @@ Phase C SQLite 加密策略：
 - 不引入外部 KMS。
 - 使用环境变量 `WORKBENCH_SECRET_KEY` 做本地加密 key。
 - 如果未配置，开发环境允许 fallback 到固定 dev key，并在 `/health` 标记 `credential_security: dev`.
-- API 永远不返回明文 key。
+- API 默认不返回明文 key。
+- 明文 key 只能通过独立的受权限控制接口临时返回。
+- 每次查看明文 key 必须写入 `model_provider.secret_viewed` 审计事件。
 
 ## 3. API Contracts
 
@@ -299,20 +301,24 @@ def test_disabled_provider_is_not_available(session): ...
 
 ## 6. Frontend Impact Gate
 
-Phase C ultimately needs UI in left-bottom “设置与模型”, but implementation must stop before UI coding and confirm:
+Phase C UI decision is confirmed:
 
 ```text
-1. 设置页是否使用 assistant-ui/shadcn 现有布局
-2. Provider 列表、表单、连通性测试如何展示
-3. 普通用户和管理员看到哪些字段
-4. API Key 输入后是否清空输入框
+1. 使用完整设置页面，形态类似 Codex。
+2. 入口为左下角“设置与模型”。
+3. 普通用户可以看到 Provider 配置，但只能查看授权范围内字段，不能新增或编辑未授权配置。
+4. API Key 默认脱敏展示。
+5. 具备权限的管理员可以切换脱敏/非脱敏。
+6. 查看 API Key 明文必须写审计事件。
+7. 第一版只支持 OpenAI-compatible Provider，不做专有 SDK。
 ```
 
-Backend work can proceed without frontend confirmation.
+Frontend implementation can proceed under these constraints. If the concrete UI needs偏离 Codex-style 完整设置页，再重新确认。
 
 ## 7. Acceptance Checklist
 
-- [ ] API Key never appears in GET responses.
+- [ ] API Key does not appear in normal GET responses.
+- [ ] API Key plaintext view requires explicit permission and writes audit.
 - [ ] API Key stored server-side only.
 - [ ] Manual model list works.
 - [ ] `/models` refresh works with fake provider.
@@ -332,4 +338,3 @@ pytest -q
 cd ..
 python3 -m py_compile backend/app/*.py backend/app/routes/*.py backend/app/model_provider/*.py
 ```
-

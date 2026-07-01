@@ -343,6 +343,14 @@ GET    /api/models/available
 
 ### 5.5 前端页面
 
+页面形态：
+
+```text
+完整设置页面，类似 Codex。
+入口：左下角“设置与模型”。
+第一版只支持 OpenAI-compatible Provider，不做专有 SDK。
+```
+
 设置页分区：
 
 ```text
@@ -359,16 +367,25 @@ Provider 列表
 角色：
 
 ```text
-普通用户：只能选择已授权模型，不能新增 Provider，不能查看 API Key。
+普通用户：可以看到 Provider 配置，但只能查看授权字段，不能新增/编辑未授权配置。
 团队管理员：可为团队设置默认模型。
 租户管理员：可新增、编辑、禁用租户级 Provider。
 系统管理员：可管理全局 Provider 和系统默认模型。
 ```
 
+API Key 展示：
+
+```text
+默认脱敏展示。
+有权限的管理员可切换脱敏/非脱敏。
+查看明文必须写审计事件。
+```
+
 ### 5.6 验收
 
 - API Key 不进入前端持久化；
-- 前端只展示脱敏 key；
+- 前端默认展示脱敏 key；
+- 有权限查看明文时必须审计；
 - 可手动填写模型；
 - Provider 支持 `/models` 时可拉取模型列表；
 - 连接测试产生审计；
@@ -383,7 +400,7 @@ Provider 列表
 ### 6.2 插件分层
 
 ```text
-Plugin Package：发布、安装、授权、启停、版本、依赖、UI、配置。
+Plugin Package：发布、租户级启用、授权、启停、版本、依赖、UI、配置。
 Skill：告诉 Agent 什么时候使用能力、如何澄清、如何解释结果。
 Tool / Capability：模型可调用能力、schema、风险、权限、结果。
 Connector：服务端实际连接业务系统或外部系统的执行层。
@@ -407,7 +424,7 @@ backend/app/routes/plugins.py
 ```text
 PluginPackage
 PluginVersion
-PluginInstallation
+PluginEnablement
 PluginAuthorization
 PluginReleasePolicy
 PluginVisibilityRule
@@ -422,7 +439,6 @@ PluginAuditEvent
 ```text
 published
 visible
-installed
 authorization_required
 authorized
 enabled
@@ -437,7 +453,6 @@ removed
 ```text
 GET    /api/plugins/catalog
 GET    /api/plugins/{plugin_id}
-POST   /api/plugins/{plugin_id}/install
 POST   /api/plugins/{plugin_id}/authorize
 POST   /api/plugins/{plugin_id}/enable
 POST   /api/plugins/{plugin_id}/disable
@@ -448,24 +463,22 @@ POST   /api/plugins/admin/packages
 PATCH  /api/plugins/admin/packages/{plugin_id}
 ```
 
-### 6.6 前端页面分区
+### 6.6 前端页面
 
 ```text
-全部插件
-已安装
-待授权
-可升级
-已停用
-管理员管理
-审计记录
+插件中心作为设置页面里的一个菜单，打开完整页面，形态类似 Codex。
+插件主视图按业务类型组织，例如问数、理赔、投保、查询、办公、本地文件、外部通用。
+全部插件、已授权、待授权、可升级、已停用、管理员管理、审计记录作为筛选条件。
+Web 形态普通用户不显示“安装”，只显示“申请授权 / 启用 / 停用 / 使用”。
+管理员管理和审计记录第一版展示。
 ```
 
 ### 6.7 验收
 
 - 左侧栏“插件”打开插件中心；
 - 普通用户可启停个人插件；
-- 普通用户不能安装内部业务插件到租户；
-- 租户管理员可安装租户级插件；
+- 普通用户不能发布或租户级启用内部业务插件；
+- 租户管理员可租户级启用内部业务插件；
 - 插件启停产生审计；
 - 待授权插件可发起授权/权限申请。
 
@@ -655,7 +668,9 @@ GET  /api/approvals
 
 ```text
 主对话展示审批摘要卡片。
-右侧审批 Tab 长期保留完整审批详情。
+审批中心集成在设置页面中，形态类似 Codex。
+审批详情不放右侧业务面板。
+主对话审批摘要卡片点击后进入设置页审批详情。
 审批通过后默认不自动恢复，需要用户点击“继续执行”。
 审批拒绝后允许修改范围重新提交。
 审批默认 7 天过期，可配置。
@@ -664,7 +679,7 @@ GET  /api/approvals
 ### 8.8 验收
 
 - 超权能创建审批申请；
-- 右侧审批 Tab 展示详情；
+- 设置页审批中心展示详情；
 - mock 审批能通过/拒绝；
 - 审批通过后点击继续执行能恢复 blocked tool_call；
 - 审批拒绝后可修改范围重新提交；
@@ -674,7 +689,7 @@ GET  /api/approvals
 
 ### 9.1 目标
 
-实现插件业务结果、审批、查询计划、图表、表格、表单的右侧展示体系。
+实现插件业务结果、查询计划、图表、表格、表单的右侧展示体系。审批中心不放右侧业务面板。
 
 ### 9.2 核心规则
 
@@ -685,6 +700,8 @@ Artifact 必须跟随会话区分。
 点击卡片后右侧打开或切换到对应 Artifact。
 同一会话内多次查询形成多条结果记录，不能简单覆盖。
 Tab 关闭不删除 Artifact。
+下载、导出、复制都需要权限判断和审计。
+相同内容、相同用户、相同权限范围、相同操作类型可复用已通过审核，不重复审批。
 ```
 
 ### 9.3 后端模型
@@ -706,7 +723,6 @@ Table
 Metric
 Chart
 Form
-Approval
 QueryPlan
 AuditInfo
 ErrorState
@@ -719,6 +735,8 @@ ErrorState
 服务端返回 renderer_hint。
 前端根据 renderer_hint 找业务组件。
 找不到 renderer 时展示通用 JSON / 表格 fallback。
+AI 动态 UI 使用受控 Artifact schema + renderer_hint 白名单。
+不允许 AI 直接生成并执行 React/JS 代码。
 ```
 
 ### 9.6 下载规则
@@ -727,6 +745,7 @@ ErrorState
 普通文本 / 小表格：允许复制。
 业务查询结果：下载需要权限判断和审计。
 敏感数据 / 明细数据：默认不允许下载，需审批。
+相同用户、相同 Artifact 内容、相同权限范围、相同操作类型已有有效通过记录时，可以复用审核结果。
 ```
 
 ### 9.7 验收
@@ -799,7 +818,7 @@ npm run lint
 Thread history
 模型设置页
 插件中心
-审批 Tab
+设置页审批中心
 Artifact 卡片
 右侧 renderer fallback
 权限不足状态
@@ -816,7 +835,7 @@ Artifact 卡片
 启用问数插件
 发起问数查询
 权限允许 → 执行 Connector → 生成 Artifact → 主对话卡片 → 右侧展示结果 → 写审计
-权限不足 → 创建审批 → 右侧审批 Tab → mock 通过 → 用户点击继续执行 → 生成结果 → 写审计
+权限不足 → 创建审批 → 设置页审批中心 → mock 通过 → 用户点击继续执行 → 生成结果 → 写审计
 ```
 
 ## 12. 开发前最终门槛
