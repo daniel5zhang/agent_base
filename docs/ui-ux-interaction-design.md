@@ -5,6 +5,8 @@
 视觉与交互参考：Codex、assistant-ui Base、shadcn/ui  
 当前前端技术栈：Next.js + assistant-ui + shadcn/ui  
 
+版本化产出物：[`docs/ui-ux/v1/README.md`](./ui-ux/v1/README.md)
+
 ## 1. 设计目标
 
 工作台不是传统后台系统，也不是单纯聊天机器人。它的核心交互是：
@@ -841,4 +843,3 @@ UI/UX 开发顺序建议：
 - [ ] 未注册 renderer 安全 fallback。
 - [ ] 下载/导出/复制走权限和审计。
 - [ ] 相同内容审核可复用，但复用也写审计。
-

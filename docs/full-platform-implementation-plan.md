@@ -5,6 +5,8 @@
 当前技术栈：前端 Next.js + assistant-ui；后端 Python FastAPI + SQLite  
 参考架构：Codex-style Plugin Architecture + 金融企业权限、审批、审计、Connector Runtime
 
+开发前 UI/UX 设计基线：[`docs/ui-ux/v1/README.md`](./ui-ux/v1/README.md)
+
 ## 1. 目标
 
 把工作台从当前的一阶段 Agent 原型，建设为完整企业 Agent 工作台平台：
