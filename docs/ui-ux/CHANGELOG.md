@@ -27,8 +27,10 @@
 
 - `wireframes.md`：页面级低保真线框。
 - `page-specs.md`：页面规格、组件拆分、数据接口和验收条件。
+- `pre-development-review.md`：UI/UX 开发前评审结论、开发准入、优先级和暂缓项。
 
 用途：
 
 - 支撑开发前 UI/UX 评审。
 - 明确哪些区域用 assistant-ui 官方能力，哪些区域使用 shadcn/ui 或自定义组件。
+- 明确 Phase A 可以开工，以及哪些能力必须暂缓到对应 Phase。

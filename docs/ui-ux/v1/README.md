@@ -33,6 +33,7 @@ v1 的目标是把已经确认的 Phase A-G 平台能力，落成开发前可执
 | `development-mapping.md` | Phase A-G 到 UI/UX 的开发映射和验收边界 |
 | `wireframes.md` | 页面级低保真线框，明确各区域结构和主路径 |
 | `page-specs.md` | 页面规格与开发约束，拆解组件、数据接口和验收条件 |
+| `pre-development-review.md` | UI/UX 开发前评审结论，确认开发准入、优先级和暂缓项 |
 
 ## 3. 当前页面证据
 
@@ -83,6 +84,7 @@ docs/ui-ux/CHANGELOG.md  版本变化摘要
 1. wireframes.md：先确认页面结构和区域职责
 2. page-specs.md：再确认组件、接口、验收边界
 3. development-mapping.md：最后映射到 Phase A-G 开发计划
+4. pre-development-review.md：确认开发准入和 Phase A 入口
 ```
 
 评审通过后，优先进入 Phase A：Agent Runtime 完整化，并同步修复主对话流式输出、执行过程和历史会话加载体验。
