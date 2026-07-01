@@ -31,6 +31,8 @@ v1 的目标是把已经确认的 Phase A-G 平台能力，落成开发前可执
 | `interaction-flows.md` | 核心交互流程，覆盖通用对话、模型配置、插件授权、审批、Artifact |
 | `component-state-spec.md` | 组件状态矩阵，定义加载、空态、错误、权限、审计等状态 |
 | `development-mapping.md` | Phase A-G 到 UI/UX 的开发映射和验收边界 |
+| `wireframes.md` | 页面级低保真线框，明确各区域结构和主路径 |
+| `page-specs.md` | 页面规格与开发约束，拆解组件、数据接口和验收条件 |
 
 ## 3. 当前页面证据
 
@@ -73,3 +75,14 @@ docs/ui-ux/CHANGELOG.md  版本变化摘要
 - Phase C/D/F/G 涉及前端页面和交互时，必须先按本设计包实现信息架构和状态规则。
 - 如果实现中发现 assistant-ui 官方组件无法覆盖核心交互，必须先说明缺口、替代组件设计和对用户体验的影响，再进入自定义实现。
 
+## 7. 下一步使用方式
+
+进入开发前，建议按以下顺序评审：
+
+```text
+1. wireframes.md：先确认页面结构和区域职责
+2. page-specs.md：再确认组件、接口、验收边界
+3. development-mapping.md：最后映射到 Phase A-G 开发计划
+```
+
+评审通过后，优先进入 Phase A：Agent Runtime 完整化，并同步修复主对话流式输出、执行过程和历史会话加载体验。

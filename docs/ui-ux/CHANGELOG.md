@@ -21,3 +21,14 @@
 - 主对话保留自然语言上下文、执行过程、审批摘要、Artifact 结果卡片。
 - AI 动态 UI 采用受控 Artifact schema，不执行模型生成 JS。
 
+### v1 补充 - 页面级设计细化
+
+新增：
+
+- `wireframes.md`：页面级低保真线框。
+- `page-specs.md`：页面规格、组件拆分、数据接口和验收条件。
+
+用途：
+
+- 支撑开发前 UI/UX 评审。
+- 明确哪些区域用 assistant-ui 官方能力，哪些区域使用 shadcn/ui 或自定义组件。
